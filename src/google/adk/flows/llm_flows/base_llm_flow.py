@@ -87,11 +87,19 @@ class BaseLlmFlow(ABC):
       return
 
     llm = self.__get_llm(invocation_context)
-    logger.debug(
-        'Establishing live connection for agent: %s with llm request: %s',
-        invocation_context.agent.name,
-        llm_request,
-    )
+    if not invocation_context.llm_connection:
+      logger.debug(
+          'Establishing live connection for agent: %s with llm request: %s',
+          invocation_context.agent.name,
+          llm_request,
+      )
+      invocation_context.llm_connection = llm.connect(llm_request)
+      invocation_context.is_llm_connection_owner = True
+    else:
+      logger.debug(
+          'Reusing live connection for agent: %s',
+          invocation_context.agent.name,
+      )
 
     attempt = 1
     while True:
@@ -111,7 +119,7 @@ class BaseLlmFlow(ABC):
             'Establishing live connection for agent: %s',
             invocation_context.agent.name,
         )
-        async with llm.connect(llm_request) as llm_connection:
+        async with invocation_context.llm_connection as llm_connection:
           if llm_request.contents:
             # Sends the conversation history to the model.
             with tracer.start_as_current_span('send_data'):
@@ -184,6 +192,8 @@ class BaseLlmFlow(ABC):
                   await asyncio.sleep(1)
                   # cancel the tasks that belongs to the closed connection.
                   send_task.cancel()
+                  if invocation_context.is_llm_connection_owner:
+                    await llm_connection.close()
                   return
           finally:
             # Clean up
