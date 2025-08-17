@@ -34,6 +34,10 @@ from .base_agent import BaseAgent
 from .live_request_queue import LiveRequestQueue
 from .run_config import RunConfig
 from .transcription_entry import TranscriptionEntry
+from ..events.event import Event
+from ..models.base_llm_connection import BaseLlmConnection
+from ..sessions.state import State
+from ..tools.tool_context import ToolExecutionContext
 
 
 class LlmCallsLimitExceededError(Exception):
@@ -160,7 +164,12 @@ class InvocationContext(BaseModel):
   """Configurations for live agents under this invocation."""
 
   plugin_manager: PluginManager = Field(default_factory=PluginManager)
-  """The manager for keeping track of plugins in this invocation."""
+  llm_connection: Optional[BaseLlmConnection] = None
+  is_llm_connection_owner: bool = False
+  """The LLM connection used for the live agent.
+
+  This field is only populated when the agent is running in live mode. It
+  """
 
   _invocation_cost_manager: _InvocationCostManager = PrivateAttr(
       default_factory=_InvocationCostManager
